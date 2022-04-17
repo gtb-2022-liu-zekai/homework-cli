@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+
+# set -o pipefail
+
+declare -r TODO_ROOT="$HOME/.todo"
+declare -r TASKS_FILE="$TODO_ROOT/tasks"
+declare -r CHILD_COMMADNS="init|list|add|edit|remove|mark|unmark"
+
+if [[ $# -eq 0 ]]; then
+  echo "usage: todo <$CHILD_COMMADNS> [args]"
+  exit 1
+fi
+
+if [[ ! $1 =~ $CHILD_COMMADNS ]]; then
+  echo "Unknown Command: $1!"
+  exit 1
+fi
+
+if [[ $1 == 'init' ]]; then
+  mkdir -p "$TODO_ROOT"
+  touch "$TASKS_FILE"
+  echo "Initialized successfully"
+fi
+
+if [[ ! -f "$TASKS_FILE" ]]; then
+  echo "Please run 'todo init' before running '$1'command'."
+fi
+
+if [[ $1 == 'list' ]]; then
+  echo "# To be done"
+  grep --color=never '^[0-9]' "$TASKS_FILE" || echo "Empty"
+  echo "# Completed"
+  (grep --color=never '^x[0-9]' "$TASKS_FILE" || echo "Empty") | sed 's/^x//'
+fi
+
+if [[ $1 == 'add' ]]; then
+  shift
+  declare -r TASK_TITLE="$*"
+
+  # declare -r LAST_TASK_ID=$(cat "$TASKS_FILE" | tail -n1 | cut -d' ' -f1 | cut -b 2-)
+  declare LAST_TASK_ID
+  LAST_TASK_ID=$(wc -l "$TASKS_FILE" | cut -d' ' -f1)
+  declare -r LAST_TASK_ID
+
+  declare -r TASK_ID=$((LAST_TASK_ID + 1))
+  echo "$TASK_ID $TASK_TITLE" >>"$TASKS_FILE"
+fi
+
+if [[ $1 == 'edit' ]]; then
+  declare -r TASK_ID="$2"
+  shift 2
+  declare -r TASK_TITLE="$*"
+
+  if ! grep --silent "^x\{0,1\}${TASK_ID} " "$TASKS_FILE"; then
+    echo "TASK NOT FOUND!"
+    exit 1
+  fi
+
+  sed -i'' "s/^\(x\?${TASK_ID}\) .*/\1 ${TASK_TITLE}/" "$TASKS_FILE"
+fi
+
+if [[ $1 == 'remove' ]]; then
+  shift
+  for TASK_ID in "$@"; do
+    sed -i'' "s/^${TASK_ID} /-&/" "$TASKS_FILE"
+  done
+fi
+
+if [[ $1 == 'mark' ]]; then
+  shift
+  for TASK_ID in "$@"; do
+    sed -i'' "s/^${TASK_ID} /x&/" "$TASKS_FILE"
+  done
+fi
+
+if [[ $1 == 'unmark' ]]; then
+  shift
+  for TASK_ID in "$@"; do
+    sed -i'' "s/^x${TASK_ID} /${TASK_ID} /" "$TASKS_FILE"
+  done
+fi
+
+if [[ $1 == 'reset' ]]; then
+  truncate -s 0 "$TASKS_FILE"
+fi
